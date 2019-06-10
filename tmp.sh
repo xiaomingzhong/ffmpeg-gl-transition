@@ -35,19 +35,82 @@ ffmpeg -i 0.mp4 -i 1.mp4 -i 2.mp4   \
 function build_complex(){
 	file_list=$1
 	flen=${#file_list[@]}
-	flag=0
+	
 	for f in $file_list
 	do
     	  echo " -i "${f}
+	done
+
+	echo " -filter_complex \""
+
+	# audio list 
+	flag=0
+	for f in $file_list
+	do
+	  video_second=$(get_video_second ${f})
+	  split_second=$[${video_second} - 3]
+    	  echo " [${flag}:a]atrim=0:${split_second}["a"${flag}]; "
  	  flag=$[${flag} + 1]
 	done
+
+	# video list 
+	flag=0
+	for f in $file_list
+	do
+    	  echo " [${flag}:v]split["vf"${flag}]["vb"${flag}]; "
+	  flag=$[${flag} + 1]
+	done
+
+	# split video fragment 
+	flag=0
+	for f in $file_list
+	do
+	  video_second=$(get_video_second ${f})
+	  split_second=$[${video_second} - 3]
+      echo " ["vf"${flag}]trim=0:${split_second}["vff"${flag}]; "
+	  echo " ["vb"${flag}]trim=${split_second}:${video_second},setpts=PTS-STARTPTS["vbb"${flag}]; "
+	  flag=$[${flag} + 1]
+	done
+
+	# concat gltransition video 
+	flag=0
+	for f in $file_list
+	do
+	  	if [ $[${flag}] -le $[${flen}] ]; then # flag < flen
+          behind=$[${flag} + 1]
+    	  echo " ["vbb"${flag}]["vff"${behind}]gltransition=duration=3:source=./transitions/CircleCrop.glsl["gl"${flag}]; "
+	      flag=$[${flag} + 1]
+      	fi 
+	done 
+	
+	# concat all video fragment
+	flag=0
+	all_fragment=
+	for f in $file_list
+	do
+	  	if [ $[${flag}] == '0' ]; then # flag < flen
+          all_fragment="["vff"${flag}]"
+		  flag=$[${flag} + 1]
+		elif $[${flag}] -le $[${flen}]; then 
+    	  all_fragment=${all_fragment}"["gl"${flag}]"
+	      flag=$[${flag} + 1]
+		else 
+		  all_fragment=${all_fragment}"["vff"${flag}]"
+		  flag=$[${flag} + 1]
+      	fi 
+	done 
+	echo ${all_fragment}"concat=n=${flag} [v];"
+	# [v1][vt0][vt1][v51]concat=n=4 [v];  \
+# [audio0][audio1][audio2]concat=n=3:v=0:a=1[audio]" -map "[v]" -map "[audio]" \
+
 }
 
 
-second=$(get_video_second "/home/xiaoming/Downloads/youtube/30s/KLdI.mkv")
+second=$(get_video_second "/home/xiaoming/Downloads/youtube/30s/huzzah.mp4")
 
-paths=("11" "22")
+paths=("/home/xiaoming/Downloads/youtube/30s/huzzah.mp4" "/home/xiaoming/Downloads/youtube/30s/50_60s.mkv" "/home/xiaoming/Downloads/youtube/30s/0_10s.mp4")
 bc=$(build_complex "${paths[*]}")
+
 
 echo $second
 echo ${bc}
