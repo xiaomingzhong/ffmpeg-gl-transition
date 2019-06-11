@@ -109,7 +109,7 @@ function ffmpeg_build(){
 }
 
 
-transition_time=1 # 3s
+transition_time=3 # 3s
 transition_path=/home/xiaoming/Downloads/youtube/30s/transitions
 video_path=/home/xiaoming/Downloads/youtube/30s/source
 gltransition_name=
@@ -135,7 +135,6 @@ video_list=()
 	done
 # *****************************************************************
 
-# paths=("/home/xiaoming/Downloads/youtube/30s/1.mp4" "/home/xiaoming/Downloads/youtube/30s/2.mp4" "/home/xiaoming/Downloads/youtube/30s/0.mp4")
 input=$(build_input "${video_list[*]}")
 
 filter_complex=" -filter_complex "
@@ -145,10 +144,7 @@ filter_args=$(build_filter_args "${video_list[*]}")
 map_v=$(build_map "v")
 map_audio=$(build_map "audio")
 
-vcodec_arg=" -vcodec libx264 -crf 23 -preset medium -acodec aac -strict experimental -ac 2 -y ${out_video_name}"
+# vcodec_arg=" -vcodec libx264 -crf 23 -preset medium -acodec aac -strict experimental -ac 2 -y ${out_video_name}"
+vcodec_arg=" -vcodec libx264 -strict experimental -y ${out_video_name}"
 
 echo "ffmpeg"${input}${filter_complex}"\""${filter_args}"\""${map_v}${map_audio}${vcodec_arg}
-
-
-
-
