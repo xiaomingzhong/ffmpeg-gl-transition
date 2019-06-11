@@ -1,5 +1,9 @@
 #!/bin/bash
 
+function random_number(){
+	random=$(( (RANDOM % $1) ))
+    echo -n "$random"
+}
 function get_video_format_time(){
 	echo `ffmpeg -i $1 2>&1 | grep 'Duration' | cut -d ' ' -f 4 | sed s/,//` # 00:02:39.04
 }
@@ -29,7 +33,7 @@ function build_complex(){
 	for f in $file_list
 	do
 	  video_second=$(get_video_second ${f})
-	  split_second=$[${video_second} - 3]
+	  split_second=$[${video_second} - ${transition_time}]
       echo " [${flag}:a]atrim=0:${split_second}["a"${flag}]; "
  	  flag=$[${flag} + 1]
 	done
@@ -47,7 +51,7 @@ function build_complex(){
 	for f in $file_list
 	do
 	  video_second=$(get_video_second ${f})
-	  split_second=$[${video_second} - 3]
+	  split_second=$[${video_second} - ${transition_time}]
       echo " ["vf"${flag}]trim=0:${split_second}["vff"${flag}]; "
 	  echo " ["vb"${flag}]trim=${split_second}:${video_second},setpts=PTS-STARTPTS["vbb"${flag}]; "
 	  flag=$[${flag} + 1]
@@ -59,7 +63,12 @@ function build_complex(){
 	do
 	  	if [ $[${flag}] -le $[${flen}] ]; then # flag < flen
           behind=$[${flag} + 1]
-    	  echo " ["vbb"${flag}]["vff"${behind}]gltransition=duration=3:source=/home/xiaoming/Downloads/youtube/30s/transitions/CircleCrop.glsl["gl"${flag}]; "
+		  
+		  gl_len=${#gltransition_list[@]}
+		  rdm=$(random_number ${gl_len})
+		  gltransition_name=${gltransition_list[${rdm}]}
+		  
+    	  echo " ["vbb"${flag}]["vff"${behind}]gltransition=duration=${transition_time}:source=${transition_path}/${gltransition_name}["gl"${flag}]; "
 	      flag=$[${flag} + 1]
       	fi 
 	done 
@@ -97,21 +106,33 @@ function build_complex(){
 	done
     echo ${all_fragment}"concat=n=${flag}:v=0:a=1[audio] \""
 	echo " -map \"[v]\" -map \"[audio]\" "
-	echo " -vcodec libx264 -crf 23 -preset medium -acodec aac -strict experimental -ac 2 -y ./out.mp4"
-
+	echo " -vcodec libx264 -crf 23 -preset medium -acodec aac -strict experimental -ac 2 -y ${out_video_name}"
 }
-
 
 function ffmpeg_build(){
 	echo `ffmpeg  "$(build_complex $1)"`
 }
 
+
+transition_time=2 # 3s
+transition_path=/home/xiaoming/Downloads/youtube/30s/transitions
+gltransition_name=
+out_video_name="out.mp4"
+gltransition_list=()
+
+# *******************load glsl files*******************************
+	index=0
+	for f in ${transition_path}/*
+	do
+	  gltransition_list[index]=$(basename ${f})
+	  index=$[${index} + 1]
+	done
+# *****************************************************************
+
 paths=("/home/xiaoming/Downloads/youtube/30s/1.mp4" "/home/xiaoming/Downloads/youtube/30s/2.mp4" "/home/xiaoming/Downloads/youtube/30s/0.mp4")
 ffmpeg_args=$(build_complex "${paths[*]}")
 
-echo ${ffmpeg_args}
-
-ffmpeg ${ffmpeg_args}
+echo "ffmpeg"${ffmpeg_args}
 
 
 
