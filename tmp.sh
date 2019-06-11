@@ -13,35 +13,16 @@ function get_video_second(){
 	echo $[${h}*3600 + ${m}*60 + s ]  # 00 * 02 * 39
 }
 
-function ffmpeg_build(){
-ffmpeg -i 0.mp4 -i 1.mp4 -i 2.mp4   \
--filter_complex \
-" [0:a]atrim=0:14[audio0]; [1:a]atrim=0:14[audio1]; [2:a]atrim=0:13[audio2]; \
-  [0:v]split[v0][v10]; [1:v]split[v20][v30]; [2:v]split[v40][v50]; \
-[v0]trim=0:13[v1];  \
-[v10]trim=13:15,setpts=PTS-STARTPTS[v11];  \
-[v20]trim=0:13[v21];  \
-[v30]trim=13:15,setpts=PTS-STARTPTS[v31];  \
-[v40]trim=0:13[v41]; \
-[v50]trim=13:15,setpts=PTS-STARTPTS[v51];  \
-[v11][v21]gltransition=duration=1:source=./transitions/CircleCrop.glsl[vt0]; \
-[v31][v41]gltransition=duration=1:source=./transitions/CircleCrop.glsl[vt1];  \
-[v1][vt0][vt1][v51]concat=n=4 [v];  \
-[audio0][audio1][audio2]concat=n=3:v=0:a=1[audio]" -map "[v]" -map "[audio]" \
--vcodec libx264 -crf 23 -preset medium -acodec aac -strict experimental -ac 2 -y out.mp4
-}
-
-
 function build_complex(){
 	file_list=$1
 	flen=${#file_list[@]}
 	
 	for f in $file_list
 	do
-    	  echo " -i "${f}
+    	  echo " -i "${f}" "
 	done
 
-	echo " -filter_complex \""
+	echo " -filter_complex \" "
 
 	# audio list 
 	flag=0
@@ -49,7 +30,7 @@ function build_complex(){
 	do
 	  video_second=$(get_video_second ${f})
 	  split_second=$[${video_second} - 3]
-    	  echo " [${flag}:a]atrim=0:${split_second}["a"${flag}]; "
+      echo " [${flag}:a]atrim=0:${split_second}["a"${flag}]; "
  	  flag=$[${flag} + 1]
 	done
 
@@ -78,42 +59,60 @@ function build_complex(){
 	do
 	  	if [ $[${flag}] -le $[${flen}] ]; then # flag < flen
           behind=$[${flag} + 1]
-    	  echo " ["vbb"${flag}]["vff"${behind}]gltransition=duration=3:source=./transitions/CircleCrop.glsl["gl"${flag}]; "
+    	  echo " ["vbb"${flag}]["vff"${behind}]gltransition=duration=3:source=/home/xiaoming/Downloads/youtube/30s/transitions/CircleCrop.glsl["gl"${flag}]; "
 	      flag=$[${flag} + 1]
       	fi 
 	done 
 	
 	# concat all video fragment
 	flag=0
+	size=0
 	all_fragment=
 	for f in $file_list
 	do
-	  	if [ $[${flag}] == '0' ]; then # flag < flen
+	  	if [ $[${flag}] == '0' ]; then  # flag < flen
           all_fragment="["vff"${flag}]"
+		  all_fragment=${all_fragment}"["gl"${flag}]"
 		  flag=$[${flag} + 1]
-		elif $[${flag}] -le $[${flen}]; then 
+		  size=$[${size} + 2]
+		elif [ $[${flag}] -le $[${flen}] ]; then  
     	  all_fragment=${all_fragment}"["gl"${flag}]"
 	      flag=$[${flag} + 1]
+		  size=$[${size} + 1]
 		else 
-		  all_fragment=${all_fragment}"["vff"${flag}]"
+		  all_fragment=${all_fragment}"["vbb"${flag}]"
 		  flag=$[${flag} + 1]
+		  size=$[${size} + 1]
       	fi 
 	done 
-	echo ${all_fragment}"concat=n=${flag} [v];"
-	# [v1][vt0][vt1][v51]concat=n=4 [v];  \
-# [audio0][audio1][audio2]concat=n=3:v=0:a=1[audio]" -map "[v]" -map "[audio]" \
+	echo ${all_fragment}"concat=n=${size} [v]; "
+
+	# concat all audio fragment
+	flag=0
+	all_fragment=
+	for f in $file_list
+	do
+	  all_fragment=${all_fragment}"["a"${flag}]"
+ 	  flag=$[${flag} + 1]
+	done
+    echo ${all_fragment}"concat=n=${flag}:v=0:a=1[audio] \""
+	echo " -map \"[v]\" -map \"[audio]\" "
+	echo " -vcodec libx264 -crf 23 -preset medium -acodec aac -strict experimental -ac 2 -y ./out.mp4"
 
 }
 
 
-second=$(get_video_second "/home/xiaoming/Downloads/youtube/30s/huzzah.mp4")
+function ffmpeg_build(){
+	echo `ffmpeg  "$(build_complex $1)"`
+}
 
-paths=("/home/xiaoming/Downloads/youtube/30s/huzzah.mp4" "/home/xiaoming/Downloads/youtube/30s/50_60s.mkv" "/home/xiaoming/Downloads/youtube/30s/0_10s.mp4")
-bc=$(build_complex "${paths[*]}")
+paths=("/home/xiaoming/Downloads/youtube/30s/1.mp4" "/home/xiaoming/Downloads/youtube/30s/2.mp4" "/home/xiaoming/Downloads/youtube/30s/0.mp4")
+ffmpeg_args=$(build_complex "${paths[*]}")
 
+echo ${ffmpeg_args}
 
-echo $second
-echo ${bc}
+ffmpeg ${ffmpeg_args}
+
 
 
 
